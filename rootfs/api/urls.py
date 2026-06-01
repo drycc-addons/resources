@@ -8,6 +8,9 @@ from api import views
 
 # URLs that end with slashes are ugly
 app_urlpatterns = [
+    # health checks
+    re_path(r"^healthz/?$", views.LivenessCheckView.as_view()),
+    re_path(r"^readiness/?$", views.ReadinessCheckView.as_view()),
     # resources services
     re_path(r"^resources/services/?$", views.AppResourcesViewSet.as_view({'get': 'services'})),
     re_path(

@@ -109,6 +109,10 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 100,
     'TEST_REQUEST_DEFAULT_FORMAT': 'json',
     'EXCEPTION_HANDLER': 'api.exceptions.custom_exception_handler',
+    # This service authenticates via ControllerPassthroughAuthentication and does not
+    # install django.contrib.auth/contenttypes. Disable DRF's default AnonymousUser so
+    # it does not try to import django.contrib.auth.models on the unauthenticated path.
+    'UNAUTHENTICATED_USER': None,
 }
 
 APPEND_SLASH = False
@@ -152,9 +156,6 @@ LOGGING = {
 
 # names which apps cannot reserve for routing
 RESERVED_NAME_PATTERNS = [r"^drycc(?:-[\w-]+)?$", r"^kube(?:-[\w-]+)?$", r"^default$"]
-
-# the k8s namespace in which the controller and workflow were installed.
-WORKFLOW_NAMESPACE = os.environ.get('WORKFLOW_NAMESPACE', 'drycc')
 
 # default scheduler settings
 SCHEDULER_MODULE = 'scheduler'

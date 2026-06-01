@@ -59,7 +59,7 @@ def send_app_log(app_id, msg, level=logging.INFO):
         return
     pod_ip = os.environ.get("POD_IP", "unknown")
     pod_name = os.environ.get("POD_NAME", "unknown")
-    namespace = os.environ.get("WORKFLOW_NAMESPACE", "unknown")
+    namespace = os.environ.get("NAMESPACE", "unknown")
     docker_id = hashlib.sha256(f"{namespace}:{pod_name}:{pod_ip}".encode("utf-8")).hexdigest()
     data = {
         "kubernetes": {

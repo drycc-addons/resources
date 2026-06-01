@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+#
+# This script is designed to be run inside the container
+#
+
+# fail hard and fast even on pipelines
+set -eo pipefail
+
+# set debug based on envvar
+[[ $DRYCC_DEBUG == "true" ]] && set -x
+
+echo system information:
+echo "Django Version: $(python /workspace/manage.py --version)"
+python --version
+
+# apply database migrations
+echo ""
+echo "Running database migrations"
+python -u /workspace/manage.py migrate --noinput
+
+# spawn a gunicorn server in the background
+echo ""
+echo "Starting up Gunicorn"
+gunicorn -c /workspace/drycc/gunicorn/config.py api.wsgi:application &
+
+# smart shutdown on SIGTERM (SIGINT is handled by gunicorn)
+function on_exit() {
+	GUNICORN_PID=$(cat /tmp/gunicorn.pid)
+	kill -TERM "$GUNICORN_PID" 2>/dev/null
+	wait "$GUNICORN_PID" 2>/dev/null
+	exit 0
+}
+trap on_exit TERM
+
+echo ""
+echo drycc-resources running...
+
+wait

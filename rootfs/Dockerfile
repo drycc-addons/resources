@@ -45,5 +45,5 @@ USER ${DRYCC_UID}
 
 COPY --chown=${DRYCC_UID}:${DRYCC_GID} . ${DRYCC_HOME_DIR}
 WORKDIR ${DRYCC_HOME_DIR}
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "api.wsgi:application"]
+CMD ["bin/boot"]
 EXPOSE 8000

@@ -53,5 +53,5 @@ RUN buildDeps='gcc rustc cargo  libffi-dev musl-dev openssl'; \
 
 COPY . ${DRYCC_HOME_DIR}
 WORKDIR ${DRYCC_HOME_DIR}
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "api.wsgi:application"]
+CMD ["gunicorn", "-c", "/workspace/drycc/gunicorn/config.py", "api.wsgi:application"]
 EXPOSE 8000

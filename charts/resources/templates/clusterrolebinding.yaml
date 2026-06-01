@@ -1,14 +1,15 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "resources.fullname" . }}
+  name: {{ printf "%s:drycc-resources" .Release.Namespace | quote }}
   labels:
-    {{- include "resources.labels" . | nindent 4 }}
+    app: drycc-resources
+    heritage: drycc
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: {{ include "resources.fullname" . }}
+  name: {{ printf "%s:drycc-resources" .Release.Namespace | quote }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "resources.fullname" . }}
+    name: drycc-resources
     namespace: {{ .Release.Namespace }}

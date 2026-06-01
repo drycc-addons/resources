@@ -4,7 +4,11 @@ RESTful view classes for presenting Drycc Resources API objects.
 import logging
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
+from django.db.utils import Error
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
+from django.views import View
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
@@ -13,6 +17,32 @@ from api import models, serializers
 from api.clients.controller import ControllerClient
 
 logger = logging.getLogger(__name__)
+
+
+class LivenessCheckView(View):
+    """
+    Simple liveness check view to determine if the server
+    is responding to HTTP requests.
+    """
+
+    def get(self, request):
+        return HttpResponse("OK")
+    head = get
+
+
+class ReadinessCheckView(View):
+    """Simple readiness check view to determine DB connection."""
+
+    def get(self, request):
+        try:
+            with connection.cursor() as c:
+                c.execute("SELECT 0")
+        except Error as e:
+            return HttpResponse(
+                f"Database health check failed: {e}",
+                status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return HttpResponse("OK")
+    head = get
 
 
 class BaseResourceViewSet(GenericViewSet):

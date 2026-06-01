@@ -1,22 +1,52 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "resources.fullname" . }}
+  name: drycc-resources
   labels:
-    {{- include "resources.labels" . | nindent 4 }}
+    app: drycc-resources
+    heritage: drycc
 spec:
   replicas: {{ .Values.replicaCount }}
   selector:
     matchLabels:
-      {{- include "resources.selectorLabels" . | nindent 6 }}
+      app: drycc-resources
   template:
     metadata:
       labels:
-        {{- include "resources.selectorLabels" . | nindent 8 }}
+        app: drycc-resources
     spec:
-      serviceAccountName: {{ include "resources.fullname" . }}
+      serviceAccountName: drycc-resources
+      initContainers:
+        - name: drycc-resources-init
+          image: registry.drycc.cc/drycc/python-dev:latest
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - netcat
+            - -v
+            - -u
+            - $(DRYCC_DATABASE_URL),$(DRYCC_VALKEY_URL)
+          env:
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-creds
+                  key: user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-creds
+                  key: password
+            - name: DRYCC_DATABASE_URL
+              value: "postgres://$(DB_USER):$(DB_PASSWORD)@drycc-database.{{ .Release.Namespace }}.svc:5432/resources"
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: valkey-creds
+                  key: password
+            - name: DRYCC_VALKEY_URL
+              value: "redis://:$(VALKEY_PASSWORD)@drycc-valkey.{{ .Release.Namespace }}.svc:16379/9"
       containers:
-        - name: {{ .Chart.Name }}
+        - name: drycc-resources
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -24,22 +54,35 @@ spec:
               containerPort: 8000
               protocol: TCP
           env:
+            - name: NAMESPACE
+              value: {{ .Release.Namespace | quote }}
             - name: DRYCC_CONTROLLER_URL
               value: {{ .Values.controller.url | quote }}
             - name: DRYCC_CONTROLLER_VERIFY_TLS
               value: {{ .Values.controller.verifyTLS | quote }}
             - name: DRYCC_CONTROLLER_AUTH_CACHE_TTL
               value: {{ .Values.controller.authCacheTTL | quote }}
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: database-creds
+                  key: user
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: database-creds
+                  key: password
             - name: DRYCC_DATABASE_URL
-              value: {{ .Values.database.url | quote }}
-            {{- with .Values.valkey.url }}
+              value: "postgres://$(DB_USER):$(DB_PASSWORD)@drycc-database.{{ .Release.Namespace }}.svc:5432/resources"
+            - name: VALKEY_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: valkey-creds
+                  key: password
             - name: DRYCC_VALKEY_URL
-              value: {{ . | quote }}
-            {{- end }}
+              value: "redis://:$(VALKEY_PASSWORD)@drycc-valkey.{{ .Release.Namespace }}.svc:16379/9"
             - name: K8S_API_VERIFY_TLS
               value: {{ .Values.kubernetes.apiVerifyTLS | quote }}
-            - name: WORKFLOW_NAMESPACE
-              value: {{ .Values.kubernetes.namespace | default .Release.Namespace | quote }}
             {{- with .Values.workflowManager.url }}
             - name: WORKFLOW_MANAGER_URL
               value: {{ . | quote }}
@@ -62,11 +105,11 @@ spec:
             {{- end }}
           livenessProbe:
             httpGet:
-              path: /resources/services
+              path: /healthz
               port: http
           readinessProbe:
             httpGet:
-              path: /resources/services
+              path: /readiness
               port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
