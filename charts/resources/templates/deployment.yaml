@@ -5,32 +5,18 @@ metadata:
   labels:
     {{- include "resources.labels" . | nindent 4 }}
 spec:
-  {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
-  {{- end }}
   selector:
     matchLabels:
       {{- include "resources.selectorLabels" . | nindent 6 }}
   template:
     metadata:
-      {{- with .Values.podAnnotations }}
-      annotations:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
       labels:
         {{- include "resources.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      serviceAccountName: {{ include "resources.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      serviceAccountName: {{ include "resources.fullname" . }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -46,29 +32,33 @@ spec:
               value: {{ .Values.controller.authCacheTTL | quote }}
             - name: DRYCC_DATABASE_URL
               value: {{ .Values.database.url | quote }}
+            {{- with .Values.valkey.url }}
+            - name: DRYCC_VALKEY_URL
+              value: {{ . | quote }}
+            {{- end }}
             - name: K8S_API_VERIFY_TLS
               value: {{ .Values.kubernetes.apiVerifyTLS | quote }}
             - name: WORKFLOW_NAMESPACE
-              value: {{ .Values.kubernetes.namespace | quote }}
-            {{- if .Values.workflowManager.url }}
+              value: {{ .Values.kubernetes.namespace | default .Release.Namespace | quote }}
+            {{- with .Values.workflowManager.url }}
             - name: WORKFLOW_MANAGER_URL
-              value: {{ .Values.workflowManager.url | quote }}
+              value: {{ . | quote }}
             {{- end }}
-            {{- if .Values.workflowManager.accessKey }}
+            {{- with .Values.workflowManager.accessKey }}
             - name: WORKFLOW_MANAGER_ACCESS_KEY
-              value: {{ .Values.workflowManager.accessKey | quote }}
+              value: {{ . | quote }}
             {{- end }}
-            {{- if .Values.quickwit.indexerUrl }}
+            {{- with .Values.quickwit.indexerUrl }}
             - name: QUICKWIT_INDEXER_URL
-              value: {{ .Values.quickwit.indexerUrl | quote }}
+              value: {{ . | quote }}
             {{- end }}
-            {{- if .Values.quickwit.logIndexPrefix }}
+            {{- with .Values.quickwit.logIndexPrefix }}
             - name: QUICKWIT_LOG_INDEX_PREFIX
-              value: {{ .Values.quickwit.logIndexPrefix | quote }}
+              value: {{ . | quote }}
             {{- end }}
-            {{- if .Values.secretKey }}
+            {{- with .Values.secretKey }}
             - name: DRYCC_SECRET_KEY
-              value: {{ .Values.secretKey | quote }}
+              value: {{ . | quote }}
             {{- end }}
           livenessProbe:
             httpGet:

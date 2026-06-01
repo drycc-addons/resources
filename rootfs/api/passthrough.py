@@ -50,7 +50,6 @@ class ControllerPassthroughAuthentication(authentication.BaseAuthentication):
             raise exceptions.AuthenticationFailed(
                 'Invalid token header. Token string should not contain spaces.')
 
-        token_type = auth_header[0].decode().lower()
         token = auth_header[1].decode()
 
         # Check cache first
@@ -81,7 +80,7 @@ class ControllerPassthroughAuthentication(authentication.BaseAuthentication):
 class IsAppUser(permissions.BasePermission):
     """
     Permission class that checks if the current user has access to the app's workspace.
-    
+
     - Non-viewer roles have full permissions
     - Viewer roles only have read-only access (GET/HEAD/OPTIONS)
     """
@@ -97,7 +96,7 @@ class IsAppUser(permissions.BasePermission):
         # Superusers always have access
         if getattr(request.user, 'is_superuser', False):
             return True
-        
+
         token = self._get_token(request)
         if not token:
             return False
@@ -115,14 +114,14 @@ class IsAppUser(permissions.BasePermission):
 
             workspace_data = self.controller.get_workspace(token, workspace_id)
             role = workspace_data.get('role', 'viewer')
-            
+
             if request.method in ["GET", "HEAD", "OPTIONS"]:
                 allowed_roles = ["viewer", "member", "admin"]
             elif request.method in ["POST", "PUT", "PATCH"]:
                 allowed_roles = ["member", "admin"]
             else:
                 allowed_roles = ["admin"]
-                
+
             return role in allowed_roles
         except Exception as e:
             logger.warning("Permission check failed: %s", e)

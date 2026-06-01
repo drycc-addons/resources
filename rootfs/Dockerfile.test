@@ -1,0 +1,57 @@
+ARG CODENAME
+FROM registry.drycc.cc/drycc/base:${CODENAME}
+
+ARG DRYCC_HOME_DIR=/workspace \
+  PYTHON_VERSION="3.14" \
+  VALKEY_VERSION="9.0.0" \
+  POSTGRES_VERSION="18.1" \
+  GOSU_VERSION="1.19"
+
+COPY requirements.txt ${DRYCC_HOME_DIR}/requirements.txt
+COPY dev_requirements.txt ${DRYCC_HOME_DIR}/dev_requirements.txt
+
+ENV PGDATA="/opt/drycc/postgresql/data"
+
+RUN buildDeps='gcc rustc cargo  libffi-dev musl-dev openssl'; \
+  install-packages mercurial ca-certificates git inotify-tools $buildDeps \
+  && curl -SsL https://cli.codecov.io/latest/$([ $(dpkg --print-architecture) == "arm64" ] && echo linux-arm64 || echo linux)/codecov -o /usr/local/bin/codecov \
+  && chmod +x /usr/local/bin/codecov \
+  && install-stack python $PYTHON_VERSION \
+  && install-stack valkey $VALKEY_VERSION \
+  && install-stack postgresql $POSTGRES_VERSION \
+  && install-stack gosu $GOSU_VERSION && . init-stack \
+  && python3 -m venv ${DRYCC_HOME_DIR}/.venv \
+  && source ${DRYCC_HOME_DIR}/.venv/bin/activate \
+  && pip3 install --disable-pip-version-check --no-cache-dir -r ${DRYCC_HOME_DIR}/requirements.txt \
+  && pip3 install --disable-pip-version-check --no-cache-dir -r ${DRYCC_HOME_DIR}/dev_requirements.txt \
+  # set env
+  && echo "source ${DRYCC_HOME_DIR}/.venv/bin/activate" >> /opt/drycc/python/profile.d/python.sh \
+  # cleanup
+  && scanelp ${DRYCC_HOME_DIR}/.venv/lib > runtime.txt \
+  && apt-get purge -y --auto-remove $buildDeps \
+  && install-packages $(< runtime.txt) \
+  && apt-get autoremove -y \
+  && apt-get clean -y \
+  && rm -rf \
+        /usr/share/doc \
+        /usr/share/man \
+        /usr/share/info \
+        /usr/share/locale \
+        /var/lib/apt/lists/* \
+        /var/log/* \
+        /var/cache/debconf/* \
+        /etc/systemd \
+        /lib/lsb \
+        /lib/udev \
+        /usr/lib/`echo $(uname -m)`-linux-gnu/gconv/IBM* \
+        /usr/lib/`echo $(uname -m)`-linux-gnu/gconv/EBC* \
+  && mkdir -p /usr/share/man/man{1..8} \
+  && mkdir -p /run/postgresql $PGDATA \
+  && groupadd postgres && useradd -g postgres postgres \
+  && chown -R postgres:postgres /run/postgresql $PGDATA \
+  && gosu postgres initdb -D $PGDATA
+
+COPY . ${DRYCC_HOME_DIR}
+WORKDIR ${DRYCC_HOME_DIR}
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "4", "--timeout", "120", "api.wsgi:application"]
+EXPOSE 8000

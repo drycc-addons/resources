@@ -10,5 +10,5 @@ roleRef:
   name: {{ include "resources.fullname" . }}
 subjects:
   - kind: ServiceAccount
-    name: {{ include "resources.serviceAccountName" . }}
+    name: {{ include "resources.fullname" . }}
     namespace: {{ .Release.Namespace }}

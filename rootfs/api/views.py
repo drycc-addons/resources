@@ -10,7 +10,6 @@ from rest_framework.response import Response
 from rest_framework.viewsets import GenericViewSet
 
 from api import models, serializers
-from api.exceptions import DryccException
 from api.clients.controller import ControllerClient
 
 logger = logging.getLogger(__name__)

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+#
+# This script is designed to be run inside the container
+#
+
+# fail hard and fast even on pipelines
+set -eou pipefail
+
+gosu postgres pg_ctl -D "$PGDATA" start && ln -s /tmp/.s.PGSQL.5432 /var/run/postgresql/.s.PGSQL.5432
+python3 manage.py check
+coverage run --source=api manage.py test --settings=api.settings.testing --noinput api scheduler --parallel="${TEST_PARALLEL:-8}"

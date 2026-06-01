@@ -18,7 +18,7 @@ class ControllerClient:
         self.base_url = settings.DRYCC_CONTROLLER_URL.rstrip('/')
         self.timeout = timeout
         self.verify_tls = settings.DRYCC_CONTROLLER_VERIFY_TLS
-        
+
         # Setup session with retry
         self.session = requests.Session()
         retry_strategy = Retry(
@@ -37,7 +37,7 @@ class ControllerClient:
             'Authorization': f'token {token}',
             'Content-Type': 'application/json',
         }
-        
+
         try:
             response = self.session.request(
                 method,
@@ -56,7 +56,7 @@ class ControllerClient:
     def whoami(self, token):
         """
         Get current user information.
-        
+
         Returns:
             dict: User data with id, username, is_superuser fields
         """
@@ -65,11 +65,11 @@ class ControllerClient:
     def get_workspace(self, token, workspace_id):
         """
         Get workspace information.
-        
+
         Args:
             token: Authentication token
             workspace_id: Workspace identifier
-            
+
         Returns:
             dict: Workspace data including members and roles
         """
@@ -78,11 +78,11 @@ class ControllerClient:
     def get_app(self, token, app_id):
         """
         Get application information.
-        
+
         Args:
             token: Authentication token
             app_id: Application identifier
-            
+
         Returns:
             dict: App data including workspace field
         """

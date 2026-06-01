@@ -1,8 +1,7 @@
 """
 Tests for the Resource model and views.
 """
-import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 from django.test import TestCase, override_settings
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -89,62 +88,80 @@ class ResourceAPITest(APITestCase):
             status='Ready',
             binding=None
         )
-
-    @patch('api.passthrough.ControllerClient.whoami')
-    def test_list_resources(self, mock_whoami):
-        """Test listing resources for an app."""
-        mock_whoami.return_value = {
+        # Create a mock controller to replace both instances
+        self.mock_controller = MagicMock()
+        self.mock_controller.whoami.return_value = {
             'id': 1,
             'username': 'testuser',
             'is_superuser': False
         }
+        self.mock_controller.get_app.return_value = {
+            'id': 'test-app',
+            'workspace': 'test-workspace'
+        }
+        self.mock_controller.get_workspace.return_value = {
+            'id': 'test-workspace',
+            'role': 'member'
+        }
+        # Patch the class-level controller attributes
+        from api.passthrough import (
+            ControllerPassthroughAuthentication,
+            IsAppUser,
+        )
+        from api.views import BaseResourceViewSet
+        self.auth_ctrl_patcher = patch.object(
+            ControllerPassthroughAuthentication, 'controller',
+            self.mock_controller)
+        self.isapp_ctrl_patcher = patch.object(
+            IsAppUser, 'controller', self.mock_controller)
+        self.view_ctrl_patcher = patch.object(
+            BaseResourceViewSet, 'controller', self.mock_controller)
+        self.auth_ctrl_patcher.start()
+        self.isapp_ctrl_patcher.start()
+        self.view_ctrl_patcher.start()
 
+    def _setup_common_mocks(self, role='member'):
+        """Configure common mock return values."""
+        user_data = {
+            'id': 1,
+            'username': 'testuser',
+            'is_superuser': False
+        }
+        self.mock_controller.whoami.return_value = user_data
+        self.mock_controller.get_app.return_value = {
+            'id': 'test-app',
+            'workspace': 'test-workspace'
+        }
+        self.mock_controller.get_workspace.return_value = {
+            'id': 'test-workspace',
+            'role': role
+        }
+
+    def tearDown(self):
+        self.auth_ctrl_patcher.stop()
+        self.isapp_ctrl_patcher.stop()
+        self.view_ctrl_patcher.stop()
+
+    def test_list_resources(self):
+        """Test listing resources for an app."""
         self.client.credentials(HTTP_AUTHORIZATION='token test-token')
         response = self.client.get('/apps/test-app/resources/')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]['name'], 'test-resource')
 
-    @patch('api.passthrough.ControllerClient.get_workspace')
-    @patch('api.passthrough.ControllerClient.whoami')
-    def test_retrieve_resource(self, mock_whoami, mock_get_workspace):
+    def test_retrieve_resource(self):
         """Test retrieving a single resource."""
-        mock_whoami.return_value = {
-            'id': 1,
-            'username': 'testuser',
-            'is_superuser': False
-        }
-        mock_get_workspace.return_value = {
-            'id': 'test-workspace',
-            'members': [{'user': 1, 'role': 'member'}]
-        }
-
         self.client.credentials(HTTP_AUTHORIZATION='token test-token')
         response = self.client.get('/apps/test-app/resources/test-resource/')
-        
+
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['name'], 'test-resource')
 
-    @patch('api.views.ControllerClient.get_app')
-    @patch('api.passthrough.ControllerClient.get_workspace')
-    @patch('api.passthrough.ControllerClient.whoami')
     @patch('api.models.resource.Resource.attach')
-    def test_create_resource(self, mock_attach, mock_whoami, mock_get_workspace, mock_get_app):
+    def test_create_resource(self, mock_attach):
         """Test creating a new resource."""
-        mock_whoami.return_value = {
-            'id': 1,
-            'username': 'testuser',
-            'is_superuser': False
-        }
-        mock_get_workspace.return_value = {
-            'id': 'test-workspace',
-            'members': [{'user': 1, 'role': 'member'}]
-        }
-        mock_get_app.return_value = {
-            'id': 'test-app',
-            'workspace': 'test-workspace'
-        }
         mock_attach.return_value = None
 
         self.client.credentials(HTTP_AUTHORIZATION='token test-token')
@@ -153,31 +170,25 @@ class ResourceAPITest(APITestCase):
             'plan': 'postgresql:default',
             'options': {'size': 'small'}
         }
-        response = self.client.post('/apps/test-app/resources/', data, format='json')
-        
+        response = self.client.post(
+            '/apps/test-app/resources/', data, format='json'
+        )
+
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(response.data['name'], 'new-resource')
         self.assertEqual(response.data['workspace_id'], 'test-workspace')
 
-    @patch('api.passthrough.ControllerClient.get_workspace')
-    @patch('api.passthrough.ControllerClient.whoami')
     @patch('api.models.resource.Resource.delete')
-    def test_delete_resource(self, mock_delete, mock_whoami, mock_get_workspace):
+    def test_delete_resource(self, mock_delete):
         """Test deleting a resource."""
-        mock_whoami.return_value = {
-            'id': 1,
-            'username': 'testuser',
-            'is_superuser': False
-        }
-        mock_get_workspace.return_value = {
-            'id': 'test-workspace',
-            'members': [{'user': 1, 'role': 'admin'}]
-        }
+        self._setup_common_mocks(role='admin')
         mock_delete.return_value = None
 
         self.client.credentials(HTTP_AUTHORIZATION='token test-token')
-        response = self.client.delete('/apps/test-app/resources/test-resource/')
-        
+        response = self.client.delete(
+            '/apps/test-app/resources/test-resource/'
+        )
+
         self.assertEqual(response.status_code, status.HTTP_204_NO_CONTENT)
 
 
@@ -198,10 +209,10 @@ class PassthroughAuthTest(TestCase):
 
         factory = APIRequestFactory()
         request = factory.get('/', HTTP_AUTHORIZATION='token test-token')
-        
+
         auth = ControllerPassthroughAuthentication()
         user, token = auth.authenticate(request)
-        
+
         self.assertIsNotNone(user)
         self.assertEqual(user.username, 'testuser')
         self.assertEqual(token, 'test-token')
@@ -213,10 +224,10 @@ class PassthroughAuthTest(TestCase):
 
         factory = APIRequestFactory()
         request = factory.get('/')
-        
+
         auth = ControllerPassthroughAuthentication()
         result = auth.authenticate(request)
-        
+
         self.assertIsNone(result)
 
 
@@ -237,16 +248,16 @@ class PermissionTest(TestCase):
         factory = APIRequestFactory()
         request = factory.get('/', HTTP_AUTHORIZATION='token test-token')
         request.user = LightweightUser(id=1, username='testuser')
-        
+
         resource = Resource(
             app_id='test-app',
             workspace_id='test-workspace',
             name='test-resource'
         )
-        
+
         perm = IsAppUser()
         result = perm.has_object_permission(request, None, resource)
-        
+
         self.assertTrue(result)
 
     @patch('api.clients.controller.ControllerClient.get_workspace')
@@ -261,24 +272,24 @@ class PermissionTest(TestCase):
         from rest_framework.test import APIRequestFactory
 
         factory = APIRequestFactory()
-        
+
         # Test GET request (should be allowed)
         request = factory.get('/', HTTP_AUTHORIZATION='token test-token')
         request.user = LightweightUser(id=1, username='testuser')
-        
+
         resource = Resource(
             app_id='test-app',
             workspace_id='test-workspace',
             name='test-resource'
         )
-        
+
         perm = IsAppUser()
         result = perm.has_object_permission(request, None, resource)
         self.assertTrue(result)
-        
+
         # Test POST request (should be denied)
         request = factory.post('/', HTTP_AUTHORIZATION='token test-token')
         request.user = LightweightUser(id=1, username='testuser')
-        
+
         result = perm.has_object_permission(request, None, resource)
         self.assertFalse(result)

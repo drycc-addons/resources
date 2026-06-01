@@ -1,0 +1,21 @@
+[run]
+omit =
+    */venv/*
+    */virtualenv/*
+    *tests*
+    api/__init__.py
+    api/migrations/*
+    # osx library files when not running in virtualenv
+    /Library/*
+    /System/*
+    /usr/local/lib/*
+branch = True
+
+[report]
+ignore_errors = True
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    if self.debug:
+    raise NotImplementedError
+    if __name__ == .__main__.:

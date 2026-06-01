@@ -1,0 +1,26 @@
+matrix:
+  platform:
+  - linux/amd64
+  - linux/arm64
+
+labels:
+  type: exec
+  platform: ${platform}
+
+steps:
+- name: test-linux
+  image: bash
+  commands:
+  - make test podman-build-test upload-coverage
+  environment:
+    CODENAME:
+      from_secret: codename
+    DEV_REGISTRY:
+      from_secret: dev_registry
+    CODECOV_TOKEN:
+      from_secret: codecov_token
+  when:
+    event:
+    - push
+    - tag
+    - cron

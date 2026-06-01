@@ -5,11 +5,10 @@ import requests
 import requests.exceptions
 import urllib3
 from requests_toolbelt import user_agent
-import re
 from urllib.parse import urljoin
 
 from api import utils, __version__ as drycc_version
-from scheduler.exceptions import KubeException, KubeHTTPException
+from scheduler.exceptions import KubeException
 
 
 logger = logging.getLogger(__name__)
@@ -177,7 +176,7 @@ class KubeHTTPClient(object):
 
 class SchedulerClient(KubeHTTPClient):
     """Scheduler client for the resources service.
-    
+
     Only loads svcat resources, not the full set of K8s resources.
     """
     pass

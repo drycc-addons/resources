@@ -1,5 +1,5 @@
-DRYCC_REGISTRY ?=
-IMAGE_PREFIX ?= drycc
+DRYCC_REGISTRY ?= $(DEV_REGISTRY)
+IMAGE_PREFIX ?= drycc-addons
 COMPONENT ?= resources
 SHORT_NAME ?= $(COMPONENT)
 PLATFORM ?= linux/amd64,linux/arm64

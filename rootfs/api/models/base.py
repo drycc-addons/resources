@@ -26,4 +26,3 @@ class UuidAuditedModel(AuditedModel):
     class Meta:
         """Mark :class:`UuidAuditedModel` as abstract."""
         abstract = True
-

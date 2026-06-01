@@ -168,7 +168,8 @@ K8S_API_VERIFY_TLS = os.environ.get('K8S_API_VERIFY_TLS', 'true').lower() == "tr
 SECRET_KEY = os.environ.get('DRYCC_SECRET_KEY', randstr(64))
 
 # Database
-DRYCC_DATABASE_URL = os.environ.get('DRYCC_DATABASE_URL', 'postgres://postgres:@:5432/drycc_resources')
+DRYCC_DATABASE_URL = os.environ.get(
+    'DRYCC_DATABASE_URL', 'postgres://postgres:@:5432/drycc_resources')
 DATABASES = {
     'default': dj_database_url.config(default=DRYCC_DATABASE_URL)
 }
@@ -179,16 +180,17 @@ NAME_REGEX = r'[a-z0-9]+(\-[a-z0-9]+)*'
 
 # Controller passthrough settings
 DRYCC_CONTROLLER_URL = os.environ.get('DRYCC_CONTROLLER_URL', 'http://drycc-controller.drycc')
-DRYCC_CONTROLLER_VERIFY_TLS = os.environ.get('DRYCC_CONTROLLER_VERIFY_TLS', 'true').lower() == 'true'
+DRYCC_CONTROLLER_VERIFY_TLS = os.environ.get(
+    'DRYCC_CONTROLLER_VERIFY_TLS', 'true').lower() == 'true'
 DRYCC_CONTROLLER_AUTH_CACHE_TTL = int(os.environ.get('DRYCC_CONTROLLER_AUTH_CACHE_TTL', '30'))
 DRYCC_RESOURCES_CATALOG_CACHE_TTL = int(
     os.environ.get('DRYCC_RESOURCES_CATALOG_CACHE_TTL', '300'))
 
-# Cache Configuration (using local memory cache for auth caching)
+# Cache Valkey Configuration
 CACHES = {
     "default": {
-        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-        "LOCATION": "resources-cache",
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.environ.get('DRYCC_VALKEY_URL', 'redis://:@127.0.0.1:6379'),
     }
 }
 

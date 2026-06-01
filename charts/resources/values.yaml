@@ -6,35 +6,9 @@ image:
   pullPolicy: IfNotPresent
   tag: ""
 
-imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
-
-serviceAccount:
-  create: true
-  annotations: {}
-  name: ""
-
-podAnnotations: {}
-
-podSecurityContext: {}
-
-securityContext: {}
-
 service:
   type: ClusterIP
   port: 80
-
-ingress:
-  enabled: true
-  className: ""
-  annotations: {}
-  hosts:
-    - host: resources.drycc.example.com
-      paths:
-        - path: /
-          pathType: Prefix
-  tls: []
 
 resources:
   limits:
@@ -44,16 +18,8 @@ resources:
     cpu: 100m
     memory: 128Mi
 
-autoscaling:
-  enabled: false
-  minReplicas: 1
-  maxReplicas: 100
-  targetCPUUtilizationPercentage: 80
-
 nodeSelector: {}
-
 tolerations: []
-
 affinity: {}
 
 # Controller configuration
@@ -62,6 +28,11 @@ controller:
   verifyTLS: true
   authCacheTTL: 30
 
+# Valkey configuration (optional; leave url empty to disable cache)
+# recommended: redis://:password@drycc-valkey:16379/9
+valkey:
+  url: ""
+
 # Database configuration
 database:
   url: postgres://postgres:@drycc-database:5432/drycc_resources
@@ -69,7 +40,8 @@ database:
 # Kubernetes configuration
 kubernetes:
   apiVerifyTLS: true
-  namespace: drycc
+  # namespace defaults to .Release.Namespace when empty
+  namespace: ""
 
 # Workflow manager configuration (optional)
 workflowManager:
@@ -78,8 +50,6 @@ workflowManager:
 
 # Quickwit logging configuration (optional)
 quickwit:
-  indexerUrl: ""
-  logIndexPrefix: ""
   indexerUrl: ""
   logIndexPrefix: ""
 
