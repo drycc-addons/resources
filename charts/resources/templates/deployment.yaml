@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "resources.fullname" . }}
+  labels:
+    {{- include "resources.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "resources.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "resources.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "resources.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          env:
+            - name: DRYCC_CONTROLLER_URL
+              value: {{ .Values.controller.url | quote }}
+            - name: DRYCC_CONTROLLER_VERIFY_TLS
+              value: {{ .Values.controller.verifyTLS | quote }}
+            - name: DRYCC_CONTROLLER_AUTH_CACHE_TTL
+              value: {{ .Values.controller.authCacheTTL | quote }}
+            - name: DRYCC_DATABASE_URL
+              value: {{ .Values.database.url | quote }}
+            - name: K8S_API_VERIFY_TLS
+              value: {{ .Values.kubernetes.apiVerifyTLS | quote }}
+            - name: WORKFLOW_NAMESPACE
+              value: {{ .Values.kubernetes.namespace | quote }}
+            {{- if .Values.workflowManager.url }}
+            - name: WORKFLOW_MANAGER_URL
+              value: {{ .Values.workflowManager.url | quote }}
+            {{- end }}
+            {{- if .Values.workflowManager.accessKey }}
+            - name: WORKFLOW_MANAGER_ACCESS_KEY
+              value: {{ .Values.workflowManager.accessKey | quote }}
+            {{- end }}
+            {{- if .Values.quickwit.indexerUrl }}
+            - name: QUICKWIT_INDEXER_URL
+              value: {{ .Values.quickwit.indexerUrl | quote }}
+            {{- end }}
+            {{- if .Values.quickwit.logIndexPrefix }}
+            - name: QUICKWIT_LOG_INDEX_PREFIX
+              value: {{ .Values.quickwit.logIndexPrefix | quote }}
+            {{- end }}
+            {{- if .Values.secretKey }}
+            - name: DRYCC_SECRET_KEY
+              value: {{ .Values.secretKey | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /resources/services
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /resources/services
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

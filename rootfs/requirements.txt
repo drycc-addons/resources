@@ -1,0 +1,11 @@
+# Drycc resources requirements
+django==5.2.14
+django-cors-headers==4.9.0
+djangorestframework==3.16.1
+gunicorn==23.0.0
+psycopg[binary]==3.2.12
+requests==2.33.0
+requests-toolbelt==1.0.0
+dj-database-url==3.0.1
+packaging==25.0
+jsonschema==4.25.1

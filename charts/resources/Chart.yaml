@@ -1,0 +1,14 @@
+apiVersion: v2
+name: resources
+description: A Helm chart for Drycc Resources service
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - drycc
+  - resources
+  - svcat
+  - service-catalog
+maintainers:
+  - name: Drycc Team
+    email: team@drycc.cc

@@ -1,0 +1,87 @@
+# Default values for resources.
+replicaCount: 1
+
+image:
+  repository: drycc/resources
+  pullPolicy: IfNotPresent
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: true
+  className: ""
+  annotations: {}
+  hosts:
+    - host: resources.drycc.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Controller configuration
+controller:
+  url: http://drycc-controller.drycc
+  verifyTLS: true
+  authCacheTTL: 30
+
+# Database configuration
+database:
+  url: postgres://postgres:@drycc-database:5432/drycc_resources
+
+# Kubernetes configuration
+kubernetes:
+  apiVerifyTLS: true
+  namespace: drycc
+
+# Workflow manager configuration (optional)
+workflowManager:
+  url: ""
+  accessKey: ""
+
+# Quickwit logging configuration (optional)
+quickwit:
+  indexerUrl: ""
+  logIndexPrefix: ""
+  indexerUrl: ""
+  logIndexPrefix: ""
+
+# Secret key for Django
+secretKey: ""

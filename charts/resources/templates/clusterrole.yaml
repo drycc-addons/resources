@@ -1,0 +1,16 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "resources.fullname" . }}
+  labels:
+    {{- include "resources.labels" . | nindent 4 }}
+rules:
+  - apiGroups: ["servicecatalog.k8s.io"]
+    resources: ["clusterserviceclasses", "clusterserviceplans"]
+    verbs: ["get", "list"]
+  - apiGroups: ["servicecatalog.k8s.io"]
+    resources: ["serviceinstances", "servicebindings"]
+    verbs: ["get", "list", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
