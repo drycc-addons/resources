@@ -2,9 +2,9 @@
 replicaCount: 1
 
 image:
-  repository: drycc/resources
+  repository: registry.drycc.cc/drycc-addons/resources
   pullPolicy: IfNotPresent
-  tag: ""
+  tag: "canary"
 
 service:
   type: ClusterIP

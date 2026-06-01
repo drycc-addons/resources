@@ -293,3 +293,353 @@ class PermissionTest(TestCase):
 
         result = perm.has_object_permission(request, None, resource)
         self.assertFalse(result)
+
+
+class ResourceSerializerTest(TestCase):
+    """Test the ResourceSerializer."""
+
+    def setUp(self):
+        self.resource = Resource.objects.create(
+            app_id='test-app',
+            workspace_id='test-workspace',
+            name='test-resource',
+            plan='postgresql:default',
+            options={'size': 'small'}
+        )
+
+    def test_serializer_fields(self):
+        """Test that serializer includes expected fields."""
+        from api.serializers import ResourceSerializer
+        serializer = ResourceSerializer(self.resource)
+        data = serializer.data
+        self.assertIn('app_id', data)
+        self.assertIn('workspace_id', data)
+        self.assertIn('name', data)
+        self.assertIn('plan', data)
+        self.assertIn('status', data)
+        self.assertIn('binding', data)
+        self.assertIn('options', data)
+        self.assertIn('data', data)
+        self.assertIn('uuid', data)
+        self.assertIn('created', data)
+        self.assertIn('updated', data)
+
+    def test_serializer_read_only_fields(self):
+        """Test that read-only fields are in Meta."""
+        from api.serializers import ResourceSerializer
+        serializer = ResourceSerializer(Resource())
+        # Check that read_only_fields are defined in Meta
+        self.assertIn('app_id', serializer.Meta.read_only_fields)
+        self.assertIn('workspace_id', serializer.Meta.read_only_fields)
+        self.assertIn('uuid', serializer.Meta.read_only_fields)
+
+    def test_validate_name_invalid(self):
+        """Test that invalid names are rejected."""
+        from api.serializers import validate_name
+        from rest_framework import serializers as drf_serializers
+        with self.assertRaises(drf_serializers.ValidationError):
+            validate_name('Invalid_Name')
+
+    def test_validate_name_valid(self):
+        """Test that valid names are accepted."""
+        from api.serializers import validate_name
+        result = validate_name('valid-name-123')
+        self.assertEqual(result, 'valid-name-123')
+
+    @patch('api.models.resource.Resource.attach_update')
+    def test_serializer_update(self, mock_attach_update):
+        """Test updating a resource through serializer."""
+        from api.serializers import ResourceSerializer
+        data = {'plan': 'postgresql:default', 'options': {'size': 'large'}}
+        serializer = ResourceSerializer(
+            instance=self.resource, data=data, partial=True
+        )
+        self.assertTrue(serializer.is_valid())
+        instance = serializer.save()
+        self.assertEqual(instance.plan, 'postgresql:default')
+        mock_attach_update.assert_called_once()
+
+    @patch('api.models.resource.Resource.attach_update')
+    def test_serializer_update_different_class(self, mock_attach_update):
+        """Test that updating to different service class is rejected."""
+        from api.serializers import ResourceSerializer
+        from api.exceptions import DryccException
+        data = {'plan': 'mysql:default'}
+        serializer = ResourceSerializer(
+            instance=self.resource, data=data, partial=True
+        )
+        self.assertTrue(serializer.is_valid())
+        with self.assertRaises(DryccException):
+            serializer.save()
+
+    @patch('api.models.resource.Resource.attach_update')
+    def test_serializer_update_while_provisioning(self, mock_attach_update):
+        """Test that updating while provisioning is rejected."""
+        from api.serializers import ResourceSerializer
+        from api.exceptions import DryccException
+        self.resource.status = 'Provisioning'
+        self.resource.save()
+        data = {'plan': 'postgresql:default', 'options': {'size': 'large'}}
+        serializer = ResourceSerializer(
+            instance=self.resource, data=data, partial=True
+        )
+        self.assertTrue(serializer.is_valid())
+        with self.assertRaises(DryccException):
+            serializer.save()
+
+
+class ResourceBindingAPITest(APITestCase):
+    """Test the Resource Binding API endpoints."""
+
+    def setUp(self):
+        self.resource = Resource.objects.create(
+            app_id='test-app',
+            workspace_id='test-workspace',
+            name='test-resource',
+            plan='postgresql:default',
+            status='Ready',
+            binding=None
+        )
+        # Create a mock controller
+        self.mock_controller = MagicMock()
+        self.mock_controller.whoami.return_value = {
+            'id': 1,
+            'username': 'testuser',
+            'is_superuser': False
+        }
+        self.mock_controller.get_app.return_value = {
+            'id': 'test-app',
+            'workspace': 'test-workspace'
+        }
+        self.mock_controller.get_workspace.return_value = {
+            'id': 'test-workspace',
+            'role': 'member'
+        }
+        from api.passthrough import (
+            ControllerPassthroughAuthentication,
+            IsAppUser,
+        )
+        from api.views import BaseResourceViewSet
+        self.auth_ctrl_patcher = patch.object(
+            ControllerPassthroughAuthentication, 'controller',
+            self.mock_controller)
+        self.isapp_ctrl_patcher = patch.object(
+            IsAppUser, 'controller', self.mock_controller)
+        self.view_ctrl_patcher = patch.object(
+            BaseResourceViewSet, 'controller', self.mock_controller)
+        self.auth_ctrl_patcher.start()
+        self.isapp_ctrl_patcher.start()
+        self.view_ctrl_patcher.start()
+
+    def tearDown(self):
+        self.auth_ctrl_patcher.stop()
+        self.isapp_ctrl_patcher.stop()
+        self.view_ctrl_patcher.stop()
+
+    @patch('api.models.resource.Resource.bind')
+    def test_bind_resource(self, mock_bind):
+        """Test binding a resource."""
+        mock_bind.return_value = None
+
+        self.client.credentials(HTTP_AUTHORIZATION='token test-token')
+        data = {'bind_action': 'bind'}
+        response = self.client.patch(
+            '/apps/test-app/resources/test-resource/binding/',
+            data, format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_bind.assert_called_once()
+
+    @patch('api.models.resource.Resource.unbind')
+    def test_unbind_resource(self, mock_unbind):
+        """Test unbinding a resource."""
+        mock_unbind.return_value = None
+        self.resource.binding = 'Ready'
+        self.resource.save()
+
+        self.client.credentials(HTTP_AUTHORIZATION='token test-token')
+        data = {'bind_action': 'unbind'}
+        response = self.client.patch(
+            '/apps/test-app/resources/test-resource/binding/',
+            data, format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        mock_unbind.assert_called_once()
+
+    def test_invalid_bind_action(self):
+        """Test that invalid bind actions return 404."""
+        self.client.credentials(HTTP_AUTHORIZATION='token test-token')
+        data = {'bind_action': 'invalid'}
+        response = self.client.patch(
+            '/apps/test-app/resources/test-resource/binding/',
+            data, format='json'
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+
+
+class ResourceServicesAPITest(APITestCase):
+    """Test the Resource Services API endpoints."""
+
+    def setUp(self):
+        self.mock_controller = MagicMock()
+        self.mock_controller.whoami.return_value = {
+            'id': 1,
+            'username': 'testuser',
+            'is_superuser': False
+        }
+        self.mock_controller.get_app.return_value = {
+            'id': 'test-app',
+            'workspace': 'test-workspace'
+        }
+        self.mock_controller.get_workspace.return_value = {
+            'id': 'test-workspace',
+            'role': 'member'
+        }
+        from api.passthrough import ControllerPassthroughAuthentication, IsAppUser
+        from api.views import BaseResourceViewSet
+        self.auth_ctrl_patcher = patch.object(
+            ControllerPassthroughAuthentication, 'controller',
+            self.mock_controller)
+        self.isapp_ctrl_patcher = patch.object(
+            IsAppUser, 'controller', self.mock_controller)
+        self.view_ctrl_patcher = patch.object(
+            BaseResourceViewSet, 'controller', self.mock_controller)
+        self.auth_ctrl_patcher.start()
+        self.isapp_ctrl_patcher.start()
+        self.view_ctrl_patcher.start()
+
+    def tearDown(self):
+        self.auth_ctrl_patcher.stop()
+        self.isapp_ctrl_patcher.stop()
+        self.view_ctrl_patcher.stop()
+
+    @patch('api.models.resource.Resource.services')
+    def test_list_services(self, mock_services):
+        """Test listing available services."""
+        mock_services.return_value = [
+            {'id': 'svc-1', 'name': 'postgresql', 'updateable': True}
+        ]
+
+        self.client.credentials(HTTP_AUTHORIZATION='token test-token')
+        response = self.client.get('/resources/services/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+    @patch('api.models.resource.Resource.plans')
+    def test_list_plans(self, mock_plans):
+        """Test listing plans for a service."""
+        mock_plans.return_value = [
+            {'id': 'plan-1', 'name': 'default', 'description': 'Default plan'}
+        ]
+
+        self.client.credentials(HTTP_AUTHORIZATION='token test-token')
+        response = self.client.get('/resources/services/postgresql/plans/')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+
+
+class ResourceModelMethodTest(TestCase):
+    """Test Resource model methods."""
+
+    def setUp(self):
+        self.resource = Resource.objects.create(
+            app_id='test-app',
+            workspace_id='test-workspace',
+            name='test-resource',
+            plan='postgresql:default',
+            status='Ready',
+            binding=None
+        )
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_plans(self, mock_get_scheduler):
+        """Test listing plans for a service class."""
+        mock_scheduler = Mock()
+        mock_response = Mock()
+        mock_response.json.return_value = {
+            'items': [
+                {
+                    'spec': {
+                        'externalID': 'plan-1',
+                        'externalName': 'default',
+                        'description': 'Default plan',
+                        'clusterServiceClassRef': {'name': 'svc-1'}
+                    }
+                }
+            ]
+        }
+        mock_scheduler.svcat.get_serviceplans.return_value = mock_response
+        mock_get_scheduler.return_value = mock_scheduler
+
+        # Mock services to return the service class
+        with patch.object(Resource, 'services', return_value=[
+            {'id': 'svc-1', 'name': 'postgresql', 'updateable': True}
+        ]):
+            plans = Resource.plans('postgresql')
+            self.assertEqual(len(plans), 1)
+            self.assertEqual(plans[0]['name'], 'default')
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_delete_while_binding(self, mock_get_scheduler):
+        """Test that deleting a binding resource raises exception."""
+        from api.exceptions import DryccException
+        self.resource.binding = 'Ready'
+        self.resource.save()
+
+        with self.assertRaises(DryccException):
+            self.resource.delete()
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_delete_while_provisioning(self, mock_get_scheduler):
+        """Test that deleting a provisioning resource raises exception."""
+        from api.exceptions import DryccException
+        self.resource.status = 'Provisioning'
+        self.resource.save()
+
+        with self.assertRaises(DryccException):
+            self.resource.delete()
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_bind_not_ready(self, mock_get_scheduler):
+        """Test that binding a non-ready resource raises exception."""
+        from api.exceptions import DryccException
+        self.resource.status = 'Provisioning'
+        self.resource.save()
+
+        with self.assertRaises(DryccException):
+            self.resource.bind()
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_bind_already_binding(self, mock_get_scheduler):
+        """Test that binding an already binding resource raises exception."""
+        from api.exceptions import DryccException
+        self.resource.binding = 'Ready'
+        self.resource.save()
+
+        with self.assertRaises(DryccException):
+            self.resource.bind()
+
+    @patch('api.models.resource.get_scheduler')
+    def test_resource_unbind_not_binding(self, mock_get_scheduler):
+        """Test that unbinding a non-binding resource raises exception."""
+        from api.exceptions import DryccException
+        self.resource.binding = None
+        self.resource.save()
+
+        with self.assertRaises(DryccException):
+            self.resource.unbind()
+
+    def test_resource_to_usage(self):
+        """Test the to_usage method."""
+        import time
+        timestamp = time.time()
+        usage = self.resource.to_usage(timestamp)
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]['app_id'], 'test-app')
+        self.assertEqual(usage[0]['workspace'], 'test-workspace')
+        self.assertEqual(usage[0]['type'], 'resource')
+        self.assertEqual(usage[0]['usage'], 1)
+        self.assertEqual(usage[0]['kwargs']['name'], 'test-resource')
