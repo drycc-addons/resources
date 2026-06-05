@@ -1,0 +1,22 @@
+kind: HTTPRoute
+metadata:
+  name: drycc-resources
+spec:
+  hostnames:
+  - {{ printf "drycc-resources.%s" .Values.global.platformDomain | lower }}
+  parentRefs:
+  - group: gateway.networking.k8s.io
+    kind: ListenerSet
+    name: drycc-resources
+    sectionName: http-80-resources
+  - group: gateway.networking.k8s.io
+    kind: ListenerSet
+    name: drycc-resources
+    sectionName: https-443-resources
+  rules:
+  - backendRefs:
+    - group: ""
+      kind: Service
+      name: drycc-resources
+      port: {{ .Values.service.port }}
+      weight: 1

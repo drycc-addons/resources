@@ -23,9 +23,16 @@ tolerations: []
 affinity: {}
 # Secret key for Django
 secretKey: ""
+
+# Ingress configuration
+gateway:
+  name: drycc-gateway
+  namespace: drycc
+
 # Controller configuration
 controller:
   url: http://drycc-controller.drycc
+  namespace: drycc
   verifyTLS: true
   authCacheTTL: 30
 
@@ -64,3 +71,11 @@ database:
     enabled: false
     size: 5Gi
     storageClass: ""
+
+global:
+  # The public resolvable hostname to build your cluster with.
+  #
+  # This will be the hostname that is used to build endpoints such as "drycc.$HOSTNAME"
+  platformDomain: ""
+  # Whether cert_manager is enabled to automatically generate controller certificates
+  certManagerEnabled: true

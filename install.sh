@@ -5,6 +5,8 @@ shopt -s expand_aliases
 # default vars
 DRYCC_REGISTRY="${DRYCC_REGISTRY:-registry.drycc.cc}"
 CHARTS_URL=oci://registry.drycc.cc/$([ "$CHANNEL" == "stable" ] && echo charts || echo charts-testing)
+CERT_MANAGER_ENABLED="${CERT_MANAGER_ENABLED:-false}"
+PLATFORM_DOMAIN="${PLATFORM_DOMAIN:?PLATFORM_DOMAIN is required}"
 
 # get_latest_github_release fetches the latest GitHub release tag matching a regex pattern.
 # Usage: get_latest_github_release <org/repo> <pattern>
@@ -62,35 +64,6 @@ function helm_upgrade {
   return 1
 }
 
-# get_database_url retrieves the database credentials from the drycc-database secret
-# and constructs the full postgres:// URL.
-function get_database_url {
-  local db_user db_password
-  db_user=$(kubectl get secret -n drycc database-creds -o jsonpath='{.data.user}' 2>/dev/null | base64 -d || true)
-  db_password=$(kubectl get secret -n drycc database-creds -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
-  if [[ -z "$db_user" || -z "$db_password" ]]; then
-    echo -e "\033[33m---> Warning: Could not retrieve database credentials from database-creds secret.\033[0m"
-    echo -e "\033[33m---> Using default database URL.\033[0m"
-    echo "postgres://postgres:@drycc-database:5432/resources"
-  else
-    echo "postgres://${db_user}:${db_password}@drycc-database.drycc.svc:5432/resources"
-  fi
-}
-
-# get_valkey_url retrieves the valkey password from the drycc-valkey secret
-# and constructs the full redis:// URL, matching the pattern used in helmbroker.
-function get_valkey_url {
-  local valkey_password
-  valkey_password=$(kubectl get secret -n drycc valkey-creds -o jsonpath='{.data.password}' 2>/dev/null | base64 -d || true)
-  if [[ -z "$valkey_password" ]]; then
-    echo -e "\033[33m---> Warning: Could not retrieve valkey password from valkey-creds secret.\033[0m"
-    echo -e "\033[33m---> Valkey cache will be disabled.\033[0m"
-    echo ""
-  else
-    echo "redis://:${valkey_password}@drycc-valkey.drycc.svc:16379/9"
-  fi
-}
-
 # install_resources deploys the Drycc Resources service via Helm.
 # Usage: install_resources [helm-options...]
 function install_resources {
@@ -105,9 +78,6 @@ function install_resources {
     RESOURCES_IMAGE=${DRYCC_REGISTRY}/drycc-addons/resources:canary
     RESOURCES_IMAGE_PULL_POLICY="Always"
   fi
-
-  local DATABASE_URL=$(get_database_url)
-  local VALKEY_URL=$(get_valkey_url)
 
 cat << EOF > "/tmp/resources-values.yaml"
 image:
@@ -137,6 +107,10 @@ kubernetes:
   apiVerifyTLS: ${K8S_API_VERIFY_TLS:-true}
 
 secretKey: ${DRYCC_SECRET_KEY:-$(openssl rand -hex 32)}
+
+global:
+  platformDomain: ${PLATFORM_DOMAIN}
+  certManagerEnabled: ${CERT_MANAGER_ENABLED}
 EOF
 
   helm_upgrade resources $CHARTS_URL/resources \
