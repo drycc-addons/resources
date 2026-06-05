@@ -31,7 +31,7 @@ gateway:
 
 # Controller configuration
 controller:
-  url: http://drycc-controller.drycc
+  url: http://drycc-controller-api.drycc
   namespace: drycc
   verifyTLS: true
   authCacheTTL: 30

@@ -86,7 +86,7 @@ image:
   pullPolicy: ${RESOURCES_IMAGE_PULL_POLICY}
 
 controller:
-  url: ${CONTROLLER_URL:-http://drycc-controller.drycc}
+  url: ${CONTROLLER_URL:-http://drycc-controller-api.drycc}
   verifyTLS: ${CONTROLLER_VERIFY_TLS:-true}
   authCacheTTL: ${CONTROLLER_AUTH_CACHE_TTL:-30}
 
@@ -158,8 +158,8 @@ function install_helmbroker {
 
   options=${1:-""}
   local VALKEY_PASSWORD=$(kubectl get secrets -n drycc valkey-creds -o jsonpath="{.data.password}"| base64 -d)
-  local HELMBROKER_USERNAME=${HELMBROKER_USERNAME:-$(kubectl get secrets -n drycc-helmbroker helmbroker-creds -o jsonpath="{.data.username}" 2>/dev/null | base64 -d || cat /proc/sys/kernel/random/uuid)}
-  local HELMBROKER_PASSWORD=${HELMBROKER_PASSWORD:-$(kubectl get secrets -n drycc-helmbroker helmbroker-creds -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || cat /proc/sys/kernel/random/uuid)}
+  local HELMBROKER_USERNAME=${HELMBROKER_USERNAME:-$(cat /proc/sys/kernel/random/uuid)}
+  local HELMBROKER_PASSWORD=${HELMBROKER_PASSWORD:-$(cat /proc/sys/kernel/random/uuid)}
 
   echo -e "\033[32m---> Start install helmbroker...\033[0m"
 
@@ -198,6 +198,10 @@ EOF
   echo -e "\033[32m---> Helmbroker password: $HELMBROKER_PASSWORD\033[0m"
   echo -e "\033[32m---> Helmbroker install completed!\033[0m"
 }
+
+if [[ -f /etc/rancher/k3s/k3s.yaml ]] ; then
+  export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+fi
 
 # upgrade upgrades the resources installation using --reset-then-reuse-values.
 function upgrade {
